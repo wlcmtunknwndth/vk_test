@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	Documents_Create_FullMethodName = "/documents.Documents/Create"
-	Documents_Update_FullMethodName = "/documents.Documents/Update"
+	Documents_Create_FullMethodName  = "/documents.Documents/Create"
+	Documents_Update_FullMethodName  = "/documents.Documents/Update"
+	Documents_Process_FullMethodName = "/documents.Documents/Process"
 )
 
 // DocumentsClient is the client API for Documents service.
@@ -29,6 +30,7 @@ const (
 type DocumentsClient interface {
 	Create(ctx context.Context, in *UserTDocument, opts ...grpc.CallOption) (*TDocument, error)
 	Update(ctx context.Context, in *UserTDocument, opts ...grpc.CallOption) (*TDocument, error)
+	Process(ctx context.Context, in *TDocument, opts ...grpc.CallOption) (*TDocument, error)
 }
 
 type documentsClient struct {
@@ -59,12 +61,23 @@ func (c *documentsClient) Update(ctx context.Context, in *UserTDocument, opts ..
 	return out, nil
 }
 
+func (c *documentsClient) Process(ctx context.Context, in *TDocument, opts ...grpc.CallOption) (*TDocument, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TDocument)
+	err := c.cc.Invoke(ctx, Documents_Process_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DocumentsServer is the server API for Documents service.
 // All implementations must embed UnimplementedDocumentsServer
 // for forward compatibility
 type DocumentsServer interface {
 	Create(context.Context, *UserTDocument) (*TDocument, error)
 	Update(context.Context, *UserTDocument) (*TDocument, error)
+	Process(context.Context, *TDocument) (*TDocument, error)
 	mustEmbedUnimplementedDocumentsServer()
 }
 
@@ -77,6 +90,9 @@ func (UnimplementedDocumentsServer) Create(context.Context, *UserTDocument) (*TD
 }
 func (UnimplementedDocumentsServer) Update(context.Context, *UserTDocument) (*TDocument, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedDocumentsServer) Process(context.Context, *TDocument) (*TDocument, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Process not implemented")
 }
 func (UnimplementedDocumentsServer) mustEmbedUnimplementedDocumentsServer() {}
 
@@ -127,6 +143,24 @@ func _Documents_Update_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Documents_Process_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TDocument)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DocumentsServer).Process(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Documents_Process_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DocumentsServer).Process(ctx, req.(*TDocument))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Documents_ServiceDesc is the grpc.ServiceDesc for Documents service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -141,6 +175,10 @@ var Documents_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Update",
 			Handler:    _Documents_Update_Handler,
+		},
+		{
+			MethodName: "Process",
+			Handler:    _Documents_Process_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

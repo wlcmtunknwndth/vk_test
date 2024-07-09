@@ -7,6 +7,7 @@ option go_package = "wlcmtunknwndth.docs.v1;docsv1";
 service Documents{
   rpc Create(UserTDocument) returns (TDocument);
   rpc Update(UserTDocument) returns (TDocument);
+  rpc Process(TDocument) returns (TDocument);
 }
 
 message UserTDocument{
