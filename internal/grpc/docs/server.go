@@ -12,10 +12,12 @@ type Handler interface {
 	Create(ctx context.Context, document *models.UserTDocument) (*models.TDocument, error)
 	Update(ctx context.Context, document *models.UserTDocument) (*models.TDocument, error)
 	Process(ctx context.Context, document *models.TDocument) (*models.TDocument, error)
+	Get(ctx context.Context, url string) (*models.TDocument, error)
 }
 
 const (
 	internalServerError = "internal server error"
+	notFound            = "document not found"
 )
 
 type serverAPI struct {
@@ -51,6 +53,15 @@ func (s *serverAPI) Process(ctx context.Context, req *docsv1.TDocument) (*docsv1
 	}
 
 	return docToProtocDoc(tdoc), nil
+}
+
+func (s *serverAPI) Get(ctx context.Context, req *docsv1.GetRequest) (*docsv1.TDocument, error) {
+	tdoc, err := s.docs.Get(ctx, req.Url)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, notFound)
+	}
+
+	return docToProtocDoc(tdoc), err
 }
 
 func protocDocToDoc(req *docsv1.TDocument) *models.TDocument {
