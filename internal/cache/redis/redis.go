@@ -39,6 +39,10 @@ func New(addr, pass string, db int) *Redis {
 func (r *Redis) Create(ctx context.Context, doc *models.UserTDocument) error {
 	const op = scope + "Create"
 
+	if err := r.cl.Exists(ctx, doc.Url).Err(); errors.Is(err, redis.Nil) {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
 	now := time.Now().UnixNano().Uint64()
 	if err := r.cl.Set(ctx, doc.Url, &models.TDocument{
 		Url:            doc.Url,
@@ -75,25 +79,26 @@ func (r *Redis) Save(ctx context.Context, doc *models.TDocument) error {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	if savedDoc.FetchTime < doc.FetchTime {
-		savedDoc.FetchTime = doc.FetchTime
-		savedDoc.Text = doc.Text
-	} else {
-		savedDoc.PubDate = doc.PubDate
-	}
+	//if savedDoc.FetchTime < doc.FetchTime {
+	//	savedDoc.FetchTime = doc.FetchTime
+	//	savedDoc.Text = doc.Text
+	//} else {
+	//	savedDoc.PubDate = doc.PubDate
+	//}
+	//
+	//if savedDoc.FirstFetchTime > doc.FirstFetchTime {
+	//	savedDoc.FirstFetchTime = doc.FirstFetchTime
+	//}
+	res := compareAndEdit(&savedDoc, doc)
 
-	if savedDoc.FirstFetchTime > doc.FirstFetchTime {
-		savedDoc.FirstFetchTime = doc.FirstFetchTime
-	}
-
-	if err := r.cl.Set(ctx, doc.Url, savedDoc, docTTL).Err(); err != nil {
+	if err := r.cl.Set(ctx, doc.Url, res, docTTL).Err(); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	return nil
 }
 
-func (r *Redis) Update(ctx context.Context, doc *models.TDocument) error {
+func (r *Redis) Update(ctx context.Context, doc *models.UserTDocument) error {
 	const op = scope + "Update"
 
 	if len(doc.Url) == 0 {
@@ -106,6 +111,14 @@ func (r *Redis) Update(ctx context.Context, doc *models.TDocument) error {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
+	tdoc.Text = doc.Text
+	tdoc.FetchTime = time.Now().UnixNano().Uint64()
+
+	if err := r.cl.Set(ctx, doc.Url, tdoc, docTTL).Err(); err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
 }
 
 func (r *Redis) saveTDoc(ctx context.Context, doc *models.TDocument) error {
@@ -119,16 +132,18 @@ func (r *Redis) saveTDoc(ctx context.Context, doc *models.TDocument) error {
 }
 
 func compareAndEdit(doc1 *models.TDocument, doc2 *models.TDocument) *models.TDocument {
-	var res models.TDocument
+	var res = *doc1
 
 	if doc1.FetchTime < doc2.FetchTime {
-		doc1.FetchTime = doc2.FetchTime
-		doc1.Text = doc2.Text
+		res.FetchTime = doc2.FetchTime
+		res.Text = doc2.Text
 	} else {
-		doc1.PubDate = doc2.PubDate
+		res.PubDate = doc2.PubDate
 	}
 
 	if doc1.FirstFetchTime > doc2.FirstFetchTime {
-		doc1.FirstFetchTime = doc2.FirstFetchTime
+		res.FirstFetchTime = doc2.FirstFetchTime
 	}
+
+	return &res
 }
