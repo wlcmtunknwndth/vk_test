@@ -79,16 +79,6 @@ func (r *Redis) Process(ctx context.Context, doc *docsv1.TDocument) (*docsv1.TDo
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	//if savedDoc.FetchTime < doc.FetchTime {
-	//	savedDoc.FetchTime = doc.FetchTime
-	//	savedDoc.Text = doc.Text
-	//} else {
-	//	savedDoc.PubDate = doc.PubDate
-	//}
-	//
-	//if savedDoc.FirstFetchTime > doc.FirstFetchTime {
-	//	savedDoc.FirstFetchTime = doc.FirstFetchTime
-	//}
 	res := compareAndEdit(doc, &savedDoc)
 
 	if err := r.cl.Set(ctx, doc.Url, res, docTTL).Err(); err != nil {
