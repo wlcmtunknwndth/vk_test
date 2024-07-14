@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.34.2
 // 	protoc        v5.27.1
-// source: docs.proto
+// source: docsGRPC.proto
 
 package docsv1
 

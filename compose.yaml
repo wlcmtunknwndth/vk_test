@@ -1,9 +1,42 @@
-
 services:
   server:
+    environment:
+      - config_path=/bin/server/config.yaml
     build:
       context: .
       target: final
     ports:
       - 8888:8888
+    networks: ["server"]
+    depends_on:
+      redis:
+        condition: service_started
+      nats:
+        condition: service_started
 
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass !QAZxsw2
+    volumes:
+      - cache:/data
+    networks: ["server"]
+
+  nats:
+    image: nats
+    ports:
+      - "8887:8887"
+      - "4222:4222"
+      - "8222:8222"
+    command: "--cluster_name NATS -p 4222 --cluster nats://0.0.0.0:8887 --http_port 8222"
+    networks: ["server"]
+
+volumes:
+  cache:
+    driver: local
+
+networks:
+  server:
+    name: server

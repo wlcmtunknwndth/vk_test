@@ -10,7 +10,22 @@ import (
 type Config struct {
 	Env  string     `yaml:"env" env-default:"prod"`
 	GRPC GRPCConfig `yaml:"grpc" env-required:"true"`
-	DB   Storage    `yaml:"db" env-required:"true"`
+	//DB   Storage    `yaml:"db" env-required:"true"`
+	Redis Redis `yaml:"redis" env-required:"true"`
+	Nats  Nats  `yaml:"nats" env-required:"true"`
+}
+
+type Nats struct {
+	Address       string        `yaml:"address"`
+	Retry         bool          `yaml:"retry"`
+	MaxReconnects int           `yaml:"max_reconnects"`
+	ReconnectWait time.Duration `yaml:"reconnect_wait"`
+}
+
+type Redis struct {
+	Url      string `yaml:"url" env-default:"localhost:6379"`
+	Password string `yaml:"password" env-required:"true"`
+	DbOpt    int    `yaml:"db_opt"`
 }
 
 type Storage struct {
@@ -55,7 +70,5 @@ func FetchConfigPath() string {
 		res = os.Getenv("config")
 	}
 
-	// CONFIG_PATH=./path/to/config/file.yaml sso
-	// sso --config=./path...
 	return res
 }

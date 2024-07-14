@@ -3,6 +3,7 @@ module github.com/wlcmtunknwndth/vk_test
 go 1.22.0
 
 require (
+	github.com/golang/protobuf v1.5.4
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/nats-io/nats.go v1.36.0
 	github.com/redis/go-redis/v9 v9.5.3

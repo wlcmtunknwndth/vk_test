@@ -25,18 +25,11 @@ RUN --mount=type=cache,target=/var/cache/apk \
         update-ca-certificates
 
 ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    appuser
-USER appuser
+USER root
 
-COPY --from=build /bin/server /bin/
-
+RUN mkdir /bin/server
+COPY --from=build /bin/server /bin/server
+COPY config/config.yaml /bin/server
 EXPOSE 8888
 
-ENTRYPOINT [ "/bin/server" ]
+ENTRYPOINT [ "/bin/server/server" ]

@@ -1,0 +1,24 @@
+version: "3"
+
+tasks:
+  run:
+    aliases:
+      - run
+    desc: "run container"
+    cmds:
+      - docker compose up
+
+  delete:
+    aliases:
+      - del
+    desc: "delete container and all the stuff"
+    cmds:
+      - docker compose down
+      - docker rmi vk_test-server
+#      - docker volume rm vk_test_db
+
+  clean:
+    desc: "turn of containers and delete image"
+    cmds:
+      - docker compose down
+      - docker rmi vk_test-server

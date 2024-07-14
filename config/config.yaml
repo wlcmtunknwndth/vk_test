@@ -1,1 +1,13 @@
-# there will be config
+env: "local"
+grpc:
+  port: 8888
+  timeout: 5m
+redis:
+  url: "Redis:6379"#"localhost:6379"
+  password: "!QAZxsw2"
+  db_opt: 0
+nats:
+  address: "nats://nats:4222"
+  retry: Yes
+  max_reconnects: 3
+  reconnect_wait: 2s

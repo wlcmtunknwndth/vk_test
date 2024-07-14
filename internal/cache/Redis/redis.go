@@ -1,22 +1,18 @@
-package redis
+package Redis
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"github.com/redis/go-redis/v9"
-	"github.com/wlcmtunknwndth/vk_test/internal/domain/models"
+	docsv1 "github.com/wlcmtunknwndth/vk_test/proto/gen/go"
 	"time"
 )
-
-//Create(ctx context.Context, doc *models.UserTDocument) error
-//Get(ctx context.Context, url string) (*models.TDocument, error)
-//Save(ctx context.Context, doc *models.UserTDocument) error
 
 var ErrInvalidURL = errors.New("invalid URL")
 
 const (
-	scope  = "internal.cache.redis."
+	scope  = "internal.cache.Redis."
 	docTTL = 15 * time.Minute
 )
 
@@ -24,27 +20,30 @@ type Redis struct {
 	cl *redis.Client
 }
 
-func New(addr, pass string, db int) *Redis {
+func New(addr, pass string, db int) (*Redis, error) {
 	const op = scope + "New"
-
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: pass,
 		DB:       db,
 	})
 
-	return &Redis{cl: rdb}
+	if err := rdb.Ping(context.TODO()).Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return &Redis{cl: rdb}, nil
 }
 
-func (r *Redis) Create(ctx context.Context, doc *models.UserTDocument) error {
+func (r *Redis) Create(ctx context.Context, doc *docsv1.UserTDocument) error {
 	const op = scope + "Create"
 
 	if err := r.cl.Exists(ctx, doc.Url).Err(); errors.Is(err, redis.Nil) {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	now := time.Now().UnixNano().Uint64()
-	if err := r.cl.Set(ctx, doc.Url, &models.TDocument{
+	now := uint64(time.Now().UnixNano())
+	if err := r.cl.Set(ctx, doc.Url, &docsv1.TDocument{
 		Url:            doc.Url,
 		PubDate:        now,
 		FetchTime:      now,
@@ -56,10 +55,10 @@ func (r *Redis) Create(ctx context.Context, doc *models.UserTDocument) error {
 	return nil
 }
 
-func (r *Redis) Get(ctx context.Context, url string) (*models.TDocument, error) {
+func (r *Redis) Get(ctx context.Context, url string) (*docsv1.TDocument, error) {
 	const op = scope + "Get"
 
-	var tdoc models.TDocument
+	var tdoc docsv1.TDocument
 	if err := r.cl.Get(ctx, url).Scan(&tdoc); err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -67,16 +66,17 @@ func (r *Redis) Get(ctx context.Context, url string) (*models.TDocument, error) 
 	return &tdoc, nil
 }
 
-func (r *Redis) Save(ctx context.Context, doc *models.TDocument) error {
+func (r *Redis) Process(ctx context.Context, doc *docsv1.TDocument) (*docsv1.TDocument, error) {
 	const op = scope + "Save"
 
-	var savedDoc models.TDocument
+	var savedDoc docsv1.TDocument
 	if err := r.cl.Get(ctx, doc.Url).Scan(&savedDoc); errors.Is(err, redis.Nil) {
 		if err = r.saveTDoc(ctx, doc); err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return nil, fmt.Errorf("%s: %w", op, err)
 		}
+		return doc, nil
 	} else if err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	//if savedDoc.FetchTime < doc.FetchTime {
@@ -89,39 +89,39 @@ func (r *Redis) Save(ctx context.Context, doc *models.TDocument) error {
 	//if savedDoc.FirstFetchTime > doc.FirstFetchTime {
 	//	savedDoc.FirstFetchTime = doc.FirstFetchTime
 	//}
-	res := compareAndEdit(&savedDoc, doc)
+	res := compareAndEdit(doc, &savedDoc)
 
 	if err := r.cl.Set(ctx, doc.Url, res, docTTL).Err(); err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return nil
+	return res, nil
 }
 
-func (r *Redis) Update(ctx context.Context, doc *models.UserTDocument) error {
+func (r *Redis) Update(ctx context.Context, doc *docsv1.UserTDocument) error {
 	const op = scope + "Update"
 
 	if len(doc.Url) == 0 {
 		return ErrInvalidURL
 	}
 
-	var tdoc models.TDocument
+	var tdoc docsv1.TDocument
 
 	if err := r.cl.Get(ctx, doc.Url).Scan(&tdoc); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	tdoc.Text = doc.Text
-	tdoc.FetchTime = time.Now().UnixNano().Uint64()
+	tdoc.FetchTime = uint64(time.Now().UnixNano())
 
-	if err := r.cl.Set(ctx, doc.Url, tdoc, docTTL).Err(); err != nil {
+	if err := r.cl.Set(ctx, doc.Url, &tdoc, docTTL).Err(); err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
 	return nil
 }
 
-func (r *Redis) saveTDoc(ctx context.Context, doc *models.TDocument) error {
+func (r *Redis) saveTDoc(ctx context.Context, doc *docsv1.TDocument) error {
 	const op = scope + "saveTDoc"
 
 	if err := r.cl.Set(ctx, doc.Url, doc, docTTL).Err(); err != nil {
@@ -131,14 +131,36 @@ func (r *Redis) saveTDoc(ctx context.Context, doc *models.TDocument) error {
 	return nil
 }
 
-func compareAndEdit(doc1 *models.TDocument, doc2 *models.TDocument) *models.TDocument {
-	var res = *doc1
+func compareAndEdit(doc1 *docsv1.TDocument, doc2 *docsv1.TDocument) *docsv1.TDocument {
+	var res = docsv1.TDocument{
+		Url:            doc1.Url,
+		PubDate:        doc1.PubDate,
+		FetchTime:      doc1.FetchTime,
+		Text:           doc1.Text,
+		FirstFetchTime: doc1.FirstFetchTime,
+	}
+
+	if doc1.FetchTime == 0 && doc2.FetchTime == 0 {
+		res.FetchTime = uint64(time.Now().UnixNano())
+	} else if doc1.FetchTime == 0 {
+		res.FetchTime = doc2.FetchTime
+	} else if doc2.FetchTime == 0 {
+		res.FetchTime = doc1.FetchTime
+	}
 
 	if doc1.FetchTime < doc2.FetchTime {
 		res.FetchTime = doc2.FetchTime
 		res.Text = doc2.Text
 	} else {
 		res.PubDate = doc2.PubDate
+	}
+
+	if doc1.FirstFetchTime == 0 && doc2.FirstFetchTime == 0 {
+		res.FirstFetchTime = uint64(time.Now().UnixNano())
+	} else if doc1.FirstFetchTime == 0 {
+		res.FirstFetchTime = doc2.FirstFetchTime
+	} else if doc2.FirstFetchTime == 0 {
+		res.FirstFetchTime = doc1.FirstFetchTime
 	}
 
 	if doc1.FirstFetchTime > doc2.FirstFetchTime {

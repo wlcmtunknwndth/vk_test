@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package documents;
 
-option go_package = "wlcmtunknwndth.docs.v1;docsv1";
+option go_package = "wlcmtunknwndth.docsGRPC.v1;docsv1";
 
 service Documents{
   rpc Create(UserTDocument) returns (TDocument);

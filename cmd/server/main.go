@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
+	"github.com/wlcmtunknwndth/vk_test/internal/app"
 	"github.com/wlcmtunknwndth/vk_test/internal/config"
+	"github.com/wlcmtunknwndth/vk_test/internal/lib/sl"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 const (
@@ -22,6 +27,24 @@ func main() {
 
 	log.Info("config", slog.Any("cfg", cfg))
 
+	srv, err := app.New(context.Background(), log, cfg)
+	if err != nil {
+		log.Error("couldn't run server", sl.Err(err))
+		return
+	}
+
+	go srv.GRPCSrv.MustRun()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	sign := <-stop
+
+	log.Info("stopping application", slog.String("signal", sign.String()))
+
+	srv.GRPCSrv.Stop()
+
+	log.Info("application stopped")
 }
 
 func setupLogger(env string) *slog.Logger {
