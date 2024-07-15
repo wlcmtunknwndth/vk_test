@@ -66,11 +66,25 @@ func (r *Redis) Get(ctx context.Context, url string) (*docsv1.TDocument, error) 
 	return &tdoc, nil
 }
 
+func fixDoc(doc *docsv1.TDocument) {
+	now := uint64(time.Now().UnixNano())
+	if doc.FirstFetchTime == 0 {
+		doc.FirstFetchTime = now
+	}
+	if doc.FetchTime == 0 {
+		doc.FetchTime = now
+	}
+	if doc.PubDate == 0 {
+		doc.PubDate = now
+	}
+}
+
 func (r *Redis) Process(ctx context.Context, doc *docsv1.TDocument) (*docsv1.TDocument, error) {
 	const op = scope + "Save"
 
 	var savedDoc docsv1.TDocument
 	if err := r.cl.Get(ctx, doc.Url).Scan(&savedDoc); errors.Is(err, redis.Nil) {
+		fixDoc(doc)
 		if err = r.saveTDoc(ctx, doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
@@ -136,9 +150,7 @@ func compareAndEdit(doc1 *docsv1.TDocument, doc2 *docsv1.TDocument) *docsv1.TDoc
 		res.FetchTime = doc2.FetchTime
 	} else if doc2.FetchTime == 0 {
 		res.FetchTime = doc1.FetchTime
-	}
-
-	if doc1.FetchTime < doc2.FetchTime {
+	} else if doc1.FetchTime < doc2.FetchTime {
 		res.FetchTime = doc2.FetchTime
 		res.Text = doc2.Text
 	} else {
@@ -151,10 +163,10 @@ func compareAndEdit(doc1 *docsv1.TDocument, doc2 *docsv1.TDocument) *docsv1.TDoc
 		res.FirstFetchTime = doc2.FirstFetchTime
 	} else if doc2.FirstFetchTime == 0 {
 		res.FirstFetchTime = doc1.FirstFetchTime
-	}
-
-	if doc1.FirstFetchTime > doc2.FirstFetchTime {
+	} else if doc1.FirstFetchTime > doc2.FirstFetchTime {
 		res.FirstFetchTime = doc2.FirstFetchTime
+	} else {
+		res.FirstFetchTime = doc1.FirstFetchTime
 	}
 
 	return &res
