@@ -77,6 +77,10 @@ func fixDoc(doc *docsv1.TDocument) {
 	if doc.PubDate == 0 {
 		doc.PubDate = now
 	}
+
+	if doc.FetchTime < doc.FirstFetchTime {
+		doc.FirstFetchTime = doc.FetchTime
+	}
 }
 
 func (r *Redis) Process(ctx context.Context, doc *docsv1.TDocument) (*docsv1.TDocument, error) {
@@ -167,6 +171,14 @@ func compareAndEdit(doc1 *docsv1.TDocument, doc2 *docsv1.TDocument) *docsv1.TDoc
 		res.FirstFetchTime = doc2.FirstFetchTime
 	} else {
 		res.FirstFetchTime = doc1.FirstFetchTime
+	}
+
+	if res.FetchTime < res.FirstFetchTime {
+		res.FirstFetchTime = res.FetchTime
+	} else if doc2.FetchTime < res.FirstFetchTime {
+		res.FirstFetchTime = doc2.FetchTime
+	} else if doc1.FetchTime < res.FirstFetchTime {
+		res.FirstFetchTime = doc1.FetchTime
 	}
 
 	return &res
