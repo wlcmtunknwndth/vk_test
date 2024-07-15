@@ -13,7 +13,7 @@ import (
 
 const (
 	scope   = "internal.broker.nats."
-	receive = "docsGRPC"
+	receive = "docs"
 	send    = "tdocs"
 	qrcv    = "rcv"
 	qsnd    = "snd"
